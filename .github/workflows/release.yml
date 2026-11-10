@@ -14,7 +14,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check tag matches Cargo.toml version
         run: |
@@ -50,16 +50,16 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $notes = @"
-          ## 설치
+          ## ?�치
 
-          PowerShell 에서:
+          PowerShell ?�서:
 
           ``````powershell
           irm https://github.com/${{ github.repository }}/releases/download/$tag/install.ps1 | iex
           ``````
 
-          또는 ``argmem-$tag-windows-x64.zip`` 을 받아 압축을 풀고 ``install.cmd`` 를 더블클릭하세요.
+          ?�는 ``argmem-$tag-windows-x64.zip`` ??받아 ?�축???��?``install.cmd`` �??�블?�릭?�세??
 
-          제거: ``& ([scriptblock]::Create((irm https://github.com/${{ github.repository }}/releases/latest/download/install.ps1))) -Uninstall``
+          ?�거: ``& ([scriptblock]::Create((irm https://github.com/${{ github.repository }}/releases/latest/download/install.ps1))) -Uninstall``
           "@
           gh release create $tag (Get-ChildItem dist -File).FullName --title "argmem $tag" --notes $notes
