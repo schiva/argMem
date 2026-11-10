@@ -2,6 +2,17 @@
 
 자주 쓰는 명령 파라미터를 기억해 두었다가 PowerShell / cmd 에서 자동으로 입력해 주는 Windows용 도구입니다.
 
+## 🚀 한 줄 설치
+
+> [!IMPORTANT]
+> PowerShell 에 아래 한 줄을 붙여넣으면 끝납니다. 관리자 권한은 필요 없습니다.
+>
+> ```powershell
+> irm https://github.com/schiva/argMem/releases/latest/download/install.ps1 | iex
+> ```
+>
+> 설치 후 **새 창**을 열고 `argmem add claude --dangerously-skip-permissions` 처럼 규칙을 등록하세요. 같은 명령을 다시 실행하면 최신 버전으로 업데이트됩니다. 다른 설치 방법과 제거 방법은 [설치](#설치) 를 보세요.
+
 ```text
 PS> claude␣          ← Space 를 누르면
 PS> claude --dangerously-skip-permissions ␣   ← 입력줄이 이렇게 채워짐 (Enter 전 확인·수정 가능)
