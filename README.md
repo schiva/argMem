@@ -1,5 +1,7 @@
 # argmem
 
+**한국어** | [English](README.en.md)
+
 자주 쓰는 명령 파라미터를 기억해 두었다가 PowerShell / cmd 에서 자동으로 입력해 주는 Windows용 도구입니다.
 
 ## 🚀 한 줄 설치
@@ -16,12 +18,15 @@
 ```text
 PS> claude␣          ← Space 를 누르면
 PS> claude --dangerously-skip-permissions ␣   ← 입력줄이 이렇게 채워짐 (Enter 전 확인·수정 가능)
+
+PS> claude⏎          ← 바로 Enter 를 눌러도
+PS> claude --dangerously-skip-permissions     ← 이렇게 확장되어 실행됨 (Enter 확장, 기본 켜짐)
 ```
 
 ## 주요 기능
 
 - **확장 규칙**: `claude` + Space 를 누르면 기억해 둔 파라미터가 입력줄에 채워집니다. 뒤에 `-c` 같은 파라미터를 더 붙일 수 있습니다.
-- **Enter 확장** (선택): `claude` 만 입력하고 Enter 를 눌러도 파라미터를 붙여 실행합니다. `argmem config enter on` 으로 켭니다.
+- **Enter 확장** (기본 켜짐): `claude` 만 입력하고 Enter 를 눌러도 파라미터를 붙여 실행합니다. 끄려면 `argmem config enter off` 를 실행합니다.
 - **별칭 규칙**: `gl` → `git log --oneline --graph -20` 처럼 짧은 이름을 붙입니다.
 - **cmd 지원**: 같은 규칙이 doskey 매크로로 cmd 에서도 동작합니다.
 - **learn**: PowerShell 히스토리를 분석해 자주 쓰는 명령+파라미터 조합을 추천합니다.
@@ -55,7 +60,7 @@ irm https://github.com/schiva/argMem/releases/latest/download/install.ps1 | iex
 특정 버전을 설치하거나 제거할 때:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Version v0.1.2
+& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Version v0.2.0
 & ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Uninstall
 ```
 
@@ -63,7 +68,7 @@ irm https://github.com/schiva/argMem/releases/latest/download/install.ps1 | iex
 
 ### 방법 2. zip
 
-[Releases](https://github.com/schiva/argMem/releases/latest) 에서 `argmem-<버전>-windows-x64.zip` 을 받아 압축을 풀고 `install.cmd` 를 더블클릭합니다. zip 안의 `argmem.exe` 로 방법 1 과 똑같이 설치합니다. zip 에는 `README.md` 와 `CHANGELOG.md` 도 들어 있습니다.
+[Releases](https://github.com/schiva/argMem/releases/latest) 에서 `argmem-<버전>-windows-x64.zip` 을 받아 압축을 풀고 `install.cmd` 를 더블클릭합니다. zip 안의 `argmem.exe` 로 방법 1 과 똑같이 설치합니다. zip 에는 `README.md`(한국어), `README.en.md`(영문), `CHANGELOG.md` 도 들어 있습니다.
 
 ### 릴리스 파일
 
@@ -125,24 +130,26 @@ argmem learn --pick 2 --as gs
 
 | 규칙 | PowerShell | cmd |
 |---|---|---|
-| **확장** (`claude`) | 줄 전체가 `claude` 이고 커서가 줄 끝일 때 **Space** → 파라미터가 입력줄에 채워짐. [Enter 확장](#enter-확장)을 켜면 `claude` + Enter 도 확장 후 실행 | `claude` 입력 시 doskey 가 파라미터를 붙여 실행 (화면에는 안 보임) |
+| **확장** (`claude`) | `claude` + **Space** → 파라미터가 입력줄에 채워짐 (Enter 전 확인 가능). `claude` + **Enter** → 확장 후 바로 실행 ([Enter 확장](#enter-확장), 기본 켜짐) | `claude` 입력 시 doskey 가 파라미터를 붙여 실행 (화면에는 안 보임) |
 | **별칭** (`gl`) | `gl` + Space → 펼쳐짐, `gl` + Enter → 바로 실행. `gl`(=Get-Location) 같은 기본 별칭도 덮어씀 | doskey 매크로로 펼쳐서 실행 |
 
 뒤에 파라미터를 더 붙이면 등록된 파라미터 뒤에 이어집니다. 예를 들어 `claude` + Space + `-c` 는 `claude --dangerously-skip-permissions -c` 로 실행됩니다. cmd 에서 `claude -c` 를 입력해도 결과가 같습니다.
 
 ### Enter 확장
 
-기본으로는 PowerShell 에서 **Space** 를 눌러야 확장됩니다. 그래서 `claude` 만 입력하고 바로 Enter 를 누르면 파라미터가 붙지 않습니다. Enter 로도 확장하려면 이 설정을 켜세요.
+**기본으로 켜져 있습니다.** PowerShell 에서 `claude` 만 입력하고 Enter 를 눌러도 `claude --dangerously-skip-permissions` 로 실행됩니다. cmd 와 같은 동작입니다.
 
 ```powershell
-argmem config enter on    # 켜기
-argmem config enter off   # 끄기 (기본)
 argmem config             # 현재 설정 보기
+argmem config enter off   # 끄기: Space 를 눌러 파라미터를 확인한 뒤 실행하는 방식만 사용
+argmem config enter on    # 다시 켜기 (기본)
 ```
 
 - 줄 전체가 정확히 등록 이름일 때만 Enter 에서 확장한 뒤 실행합니다. 이때 확장된 줄이 화면과 히스토리에 남습니다.
-- 켜면 Enter 를 누르기 전에 붙는 파라미터를 확인할 기회가 없어집니다.
-- 새 창부터 적용됩니다. cmd 는 원래 Enter 에서 매크로가 적용되므로 이 설정과 상관이 없습니다.
+- Enter 를 누르기 전에 붙는 파라미터를 확인할 수 없습니다. 위험한 플래그를 등록했고 실행 전에 확인하고 싶다면 끄세요.
+- **Enter 에 다른 기능을 걸어 둔 경우** (PSReadLine `Set-PSReadLineKeyHandler -Chord Enter ...`): argmem 은 그 설정을 덮어쓰지 않습니다. 대신 창을 열 때 안내 한 줄을 보여 줍니다. 안내를 없애려면 `argmem config enter off` 를 실행하세요. Enter 가 기본 동작(`AcceptLine`, `ValidateAndAcceptLine`)일 때만 확장을 적용하고, 확장한 뒤에는 원래 Enter 기능을 그대로 호출합니다.
+- 설정을 바꾸면 새 창부터 적용됩니다. cmd 는 원래 Enter 에서 매크로가 적용되므로 이 설정과 상관이 없습니다.
+- v0.1.2 이후 설정을 저장한 적이 있으면 그 값이 유지됩니다. off 로 저장해 두었다면 업데이트 후에도 off 입니다.
 
 ### 원래 명령 그대로 실행하기
 
@@ -195,8 +202,10 @@ src/emit.rs     argmem.ps1 / argmem.doskey 생성
 src/install.rs  프로필·AutoRun 연결/해제 (reg.exe 사용)
 src/learn.rs    PSReadLine 히스토리 분석
 installer/      install.ps1 (ASCII 전용, irm | iex 용) / install.cmd (zip 더블클릭용)
+                changelog-section.ps1 / release-notes.ps1 (CHANGELOG 로 릴리스 노트 작성)
 .github/workflows/release.yml   v* 태그 push 시 빌드·테스트·릴리스
 CHANGELOG.md    버전별 변경 이력 (릴리스 노트 원본)
+README.en.md    영문 README (이 문서를 고치면 함께 고칩니다)
 ```
 
 ```powershell
@@ -211,8 +220,8 @@ cargo build --release
 3. 커밋한 뒤 같은 버전의 태그를 push 합니다.
 
 ```powershell
-git tag v0.1.4
-git push origin v0.1.4
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 GitHub Actions 가 다음을 자동으로 처리합니다.

@@ -69,19 +69,36 @@ if (Get-Module PSReadLine) {
         [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
     }
 
+    # 지금 Enter 에 걸린 기능을 기억한다. 같은 창에서 다시 불러와 argmem 자신이 걸려 있으면 이전 값을 유지한다.
+    $argmemEnter = Get-PSReadLineKeyHandler -Bound | Where-Object { $_.Key -eq 'Enter' } | Select-Object -First 1
+    if ($argmemEnter -and $argmemEnter.Function -ne 'ArgmemAcceptLine') {
+        $global:ArgmemEnterBase = $argmemEnter.Function
+    } elseif (-not $global:ArgmemEnterBase) {
+        $global:ArgmemEnterBase = 'AcceptLine'
+    }
+
     if ($global:ArgmemExpandOnEnter) {
-        # Enter → 등록 이름만 있으면 확장한 뒤 실행. 확장된 줄이 화면과 히스토리에 남는다.
-        Set-PSReadLineKeyHandler -Chord Enter -BriefDescription ArgmemAcceptLine -Description 'argmem: 등록 이름만 입력하고 Enter 시 확장 후 실행' -ScriptBlock {
-            $line = $null; $cursor = $null
-            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-            if (Test-ArgmemKey $line) {
-                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $global:ArgmemRules[$line])
+        if ($global:ArgmemEnterBase -in 'AcceptLine', 'ValidateAndAcceptLine') {
+            # Enter → 등록 이름만 있으면 확장한 뒤 원래 Enter 기능으로 실행. 확장된 줄이 화면과 히스토리에 남는다.
+            Set-PSReadLineKeyHandler -Chord Enter -BriefDescription ArgmemAcceptLine -Description 'argmem: 등록 이름만 입력하고 Enter 시 확장 후 실행' -ScriptBlock {
+                $line = $null; $cursor = $null
+                [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+                if (Test-ArgmemKey $line) {
+                    [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $global:ArgmemRules[$line])
+                }
+                if ($global:ArgmemEnterBase -eq 'ValidateAndAcceptLine') {
+                    [Microsoft.PowerShell.PSConsoleReadLine]::ValidateAndAcceptLine()
+                } else {
+                    [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+                }
             }
-            [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+        } else {
+            # 사용자가 Enter 에 다른 기능을 걸어 두었으면 덮어쓰지 않는다.
+            Write-Host "argmem: Enter 키에 이미 다른 기능($($global:ArgmemEnterBase))이 있어 Enter 확장을 사용하지 않습니다. 이 안내를 끄려면: argmem config enter off" -ForegroundColor DarkYellow
         }
-    } elseif (Get-PSReadLineKeyHandler -Bound | Where-Object { $_.Key -eq 'Enter' -and $_.Function -eq 'ArgmemAcceptLine' }) {
-        # 설정을 끈 뒤 같은 창에서 다시 불러온 경우 원래 Enter 동작으로 되돌린다.
-        Set-PSReadLineKeyHandler -Chord Enter -Function AcceptLine
+    } elseif ($argmemEnter -and $argmemEnter.Function -eq 'ArgmemAcceptLine') {
+        # 설정을 끈 뒤 같은 창에서 다시 불러온 경우 원래 Enter 기능으로 되돌린다.
+        Set-PSReadLineKeyHandler -Chord Enter -Function $global:ArgmemEnterBase
     }
 }
 "#,
@@ -147,9 +164,24 @@ mod tests {
     }
 
     #[test]
-    fn old_rules_json_without_settings_still_loads() {
+    fn enter_expansion_is_on_by_default() {
+        assert!(Store::default().settings.expand_on_enter);
+        assert!(render_ps1(&[], &Store::default().settings).contains("$global:ArgmemExpandOnEnter = $true"));
+    }
+
+    #[test]
+    fn old_rules_json_without_settings_gets_default_on() {
         let s: Store = serde_json::from_str(r#"{"rules":[{"trigger":"a","command":"a","args":"-x"}]}"#).unwrap();
-        assert!(!s.settings.expand_on_enter);
+        assert!(s.settings.expand_on_enter);
         assert_eq!(s.rules.len(), 1);
+    }
+
+    #[test]
+    fn explicit_off_is_kept() {
+        let s: Store =
+            serde_json::from_str(r#"{"settings":{"expand_on_enter":false},"rules":[]}"#).unwrap();
+        assert!(!s.settings.expand_on_enter);
+        let s: Store = serde_json::from_str(r#"{"settings":{},"rules":[]}"#).unwrap();
+        assert!(s.settings.expand_on_enter);
     }
 }

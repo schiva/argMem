@@ -95,7 +95,7 @@ enum Cmd {
     /// 설정 보기/변경
     #[command(
         override_usage = "argmem config [<설정> <on|off>]",
-        after_help = "설정:\n  enter  PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행 (기본 off)\n\n예:\n  argmem config\n  argmem config enter on\n  argmem config enter off"
+        after_help = "설정:\n  enter  PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행 (기본 on)\n\n예:\n  argmem config\n  argmem config enter on\n  argmem config enter off"
     )]
     Config {
         /// 설정 이름: enter
@@ -362,7 +362,7 @@ fn run(cli: Cli) -> Result<(), String> {
             println!("규칙 파일 : {} ({}개)", store::rules_path().display(), store.rules.len());
             println!(
                 "Enter 확장: {}",
-                if store.settings.expand_on_enter { "on" } else { "off (argmem config enter on 으로 켜기)" }
+                if store.settings.expand_on_enter { "on" } else { "off (켜기: argmem config enter on)" }
             );
             println!("PowerShell: {}", emit::ps1_path().display());
             println!("cmd       : {}", emit::doskey_path().display());

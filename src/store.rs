@@ -21,11 +21,21 @@ impl Rule {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Settings {
-    /// PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행
-    #[serde(default)]
+    /// PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행 (기본 on)
+    #[serde(default = "default_true")]
     pub expand_on_enter: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings { expand_on_enter: true }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]

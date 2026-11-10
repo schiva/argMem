@@ -35,7 +35,7 @@ jobs:
           New-Item -ItemType Directory dist | Out-Null
           $pkg = "dist/argmem-$tag-windows-x64"
           New-Item -ItemType Directory $pkg | Out-Null
-          Copy-Item target/release/argmem.exe, installer/install.ps1, installer/install.cmd, README.md, CHANGELOG.md $pkg
+          Copy-Item target/release/argmem.exe, installer/install.ps1, installer/install.cmd, README.md, README.en.md, CHANGELOG.md $pkg
           Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
           Remove-Item -Recurse $pkg
           Copy-Item target/release/argmem.exe, installer/install.ps1 dist
