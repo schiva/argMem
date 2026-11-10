@@ -50,16 +50,16 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $notes = @"
-          ## ?�치
+          ## 설치
 
-          PowerShell ?�서:
+          PowerShell 에서:
 
           ``````powershell
           irm https://github.com/${{ github.repository }}/releases/download/$tag/install.ps1 | iex
           ``````
 
-          ?�는 ``argmem-$tag-windows-x64.zip`` ??받아 ?�축???��?``install.cmd`` �??�블?�릭?�세??
+          또는 ``argmem-$tag-windows-x64.zip`` 을 받아 압축을 풀고 ``install.cmd`` 를 더블클릭하세요.
 
-          ?�거: ``& ([scriptblock]::Create((irm https://github.com/${{ github.repository }}/releases/latest/download/install.ps1))) -Uninstall``
+          제거: ``& ([scriptblock]::Create((irm https://github.com/${{ github.repository }}/releases/latest/download/install.ps1))) -Uninstall``
           "@
           gh release create $tag (Get-ChildItem dist -File).FullName --title "argmem $tag" --notes $notes
