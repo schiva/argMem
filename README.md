@@ -18,6 +18,18 @@ PS> claude␣          ← Space 를 누르면
 PS> claude --dangerously-skip-permissions ␣   ← 입력줄이 이렇게 채워짐 (Enter 전 확인·수정 가능)
 ```
 
+## 주요 기능
+
+- **확장 규칙**: `claude` + Space 를 누르면 기억해 둔 파라미터가 입력줄에 채워집니다. 뒤에 `-c` 같은 파라미터를 더 붙일 수 있습니다.
+- **Enter 확장** (선택): `claude` 만 입력하고 Enter 를 눌러도 파라미터를 붙여 실행합니다. `argmem config enter on` 으로 켭니다.
+- **별칭 규칙**: `gl` → `git log --oneline --graph -20` 처럼 짧은 이름을 붙입니다.
+- **cmd 지원**: 같은 규칙이 doskey 매크로로 cmd 에서도 동작합니다.
+- **learn**: PowerShell 히스토리를 분석해 자주 쓰는 명령+파라미터 조합을 추천합니다.
+- **친절한 오류**: 잘못 입력하면 비슷한 명령을 제안하고 해당 명령의 사용법을 보여 줍니다.
+- **간편 설치·업데이트**: 한 줄 명령으로 설치하고, 같은 명령으로 업데이트합니다. 관리자 권한은 필요 없습니다.
+
+버전별 변경 내용은 [CHANGELOG.md](CHANGELOG.md) 를 보세요.
+
 ## 요구 사항
 
 - 64비트 Windows 10/11
@@ -43,13 +55,24 @@ irm https://github.com/schiva/argMem/releases/latest/download/install.ps1 | iex
 특정 버전을 설치하거나 제거할 때:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Version v0.1.0
+& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Version v0.1.2
 & ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Uninstall
 ```
 
+이미 설치돼 있으면 같은 한 줄 명령으로 최신 버전으로 업데이트됩니다. 등록한 규칙과 설정은 그대로 유지됩니다. 설치된 버전은 `argmem --version` 으로 확인합니다.
+
 ### 방법 2. zip
 
-Releases 에서 `argmem-<버전>-windows-x64.zip` 을 받아 압축을 풀고 `install.cmd` 를 더블클릭합니다. zip 안의 `argmem.exe` 로 방법 1 과 똑같이 설치합니다.
+[Releases](https://github.com/schiva/argMem/releases/latest) 에서 `argmem-<버전>-windows-x64.zip` 을 받아 압축을 풀고 `install.cmd` 를 더블클릭합니다. zip 안의 `argmem.exe` 로 방법 1 과 똑같이 설치합니다. zip 에는 `README.md` 와 `CHANGELOG.md` 도 들어 있습니다.
+
+### 릴리스 파일
+
+| 파일 | 내용 |
+|---|---|
+| `install.ps1` | 설치·업데이트·제거 스크립트 (방법 1 에서 사용) |
+| `argmem.exe` | 실행 파일 (64비트, 단독 실행) |
+| `argmem-<버전>-windows-x64.zip` | exe + 설치 스크립트 + `install.cmd` + 문서 |
+| `SHA256SUMS.txt` | 위 파일들의 SHA256 체크섬 |
 
 ### 방법 3. 소스에서 빌드
 
@@ -136,11 +159,11 @@ argmem config             # 현재 설정 보기
 
 | 경로 | 내용 |
 |---|---|
-| `%USERPROFILE%\.argmem\rules.json` | 규칙 원본 |
+| `%USERPROFILE%\.argmem\rules.json` | 규칙과 설정(`settings.expand_on_enter`) 원본 |
 | `%USERPROFILE%\.argmem\argmem.ps1` | 생성 파일. 규칙 표, 별칭 함수, PSReadLine 키 처리 (UTF-8 BOM) |
 | `%USERPROFILE%\.argmem\argmem.doskey` | 생성 파일. cmd 용 doskey 매크로 (`$` 는 `$$` 로 변환) |
 
-생성 파일은 직접 고치지 말고 `argmem add/remove` 를 쓰세요.
+생성 파일은 직접 고치지 말고 `argmem add` / `remove` / `config` 를 쓰세요.
 
 ## 제거
 
@@ -173,6 +196,7 @@ src/install.rs  프로필·AutoRun 연결/해제 (reg.exe 사용)
 src/learn.rs    PSReadLine 히스토리 분석
 installer/      install.ps1 (ASCII 전용, irm | iex 용) / install.cmd (zip 더블클릭용)
 .github/workflows/release.yml   v* 태그 push 시 빌드·테스트·릴리스
+CHANGELOG.md    버전별 변경 이력 (릴리스 노트 원본)
 ```
 
 ```powershell
@@ -182,18 +206,21 @@ cargo build --release
 
 ### 릴리스
 
-`Cargo.toml` 의 `version` 을 올리고 커밋한 뒤 같은 버전의 태그를 push 합니다.
+1. `Cargo.toml` 의 `version` 을 올립니다.
+2. `CHANGELOG.md` 맨 위에 `## [x.y.z] - 날짜` 항목을 추가합니다.
+3. 커밋한 뒤 같은 버전의 태그를 push 합니다.
 
 ```powershell
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
-GitHub Actions 가 다음을 자동으로 처리합니다. 태그와 `Cargo.toml` 버전이 다르면 실패합니다.
+GitHub Actions 가 다음을 자동으로 처리합니다.
 
-1. 테스트하고 빌드합니다.
-2. Release 를 만듭니다.
-3. 다음 파일을 올립니다: `argmem.exe`, `install.ps1`, `argmem-<태그>-windows-x64.zip`, `SHA256SUMS.txt`
+1. 태그와 `Cargo.toml` 버전이 같은지, `CHANGELOG.md` 에 그 버전 항목이 있는지 확인합니다. 다르거나 없으면 실패합니다.
+2. 테스트하고 빌드합니다.
+3. 해당 CHANGELOG 항목과 설치 방법으로 릴리스 노트를 작성해 Release 를 만듭니다.
+4. 다음 파일을 올립니다: `argmem.exe`, `install.ps1`, `argmem-<태그>-windows-x64.zip`, `SHA256SUMS.txt`
 
 아래 환경 변수로 경로를 바꾸면 실제 프로필이나 레지스트리를 건드리지 않고 시험할 수 있습니다.
 
