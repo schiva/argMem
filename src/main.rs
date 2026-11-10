@@ -3,40 +3,70 @@ mod install;
 mod learn;
 mod store;
 
-use clap::{Parser, Subcommand};
+use clap::error::{ContextKind, ContextValue, ErrorKind};
+use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand};
+use std::ffi::OsString;
 use store::{join_args, validate_name, Rule, Store};
+
+const HELP_TEMPLATE: &str = "{about-with-newline}\n사용법: {usage}\n\n{all-args}{after-help}";
+const ADD_USAGE: &str = "사용법: argmem add [--as <별칭>] <명령> <인자>...\n자세히: argmem add --help";
 
 #[derive(Parser)]
 #[command(
     name = "argmem",
+    bin_name = "argmem",
     version,
     about = "자주 쓰는 명령 파라미터를 기억해 PowerShell / cmd 에서 자동 입력합니다",
-    after_help = "예:\n  argmem add claude --dangerously-skip-permissions\n  argmem add --as gl git log --oneline --graph -20\n  argmem install"
+    after_help = "예:\n  argmem add claude --dangerously-skip-permissions\n  argmem add --as gl git log --oneline --graph -20\n  argmem install\n\n각 명령의 자세한 사용법: argmem <명령> --help",
+    subcommand_help_heading = "명령",
+    subcommand_value_name = "명령",
+    disable_help_subcommand = true,
+    disable_help_flag = true,
+    disable_version_flag = true
 )]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
+    /// 도움말 보기
+    #[arg(short = 'h', long, action = ArgAction::Help, global = true)]
+    help: Option<bool>,
+    /// 버전 보기
+    #[arg(short = 'V', long, action = ArgAction::Version)]
+    version: Option<bool>,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
     /// 규칙 추가/수정 (--as 를 주면 별칭, 안 주면 해당 명령 + Space 로 확장)
+    #[command(
+        override_usage = "argmem add [--as <별칭>] <명령> <인자>...",
+        after_help = "예:\n  argmem add claude --dangerously-skip-permissions\n  argmem add --as gl git log --oneline --graph -20"
+    )]
     Add {
-        /// 별칭 이름 (명령 앞에 써야 함)
-        #[arg(long = "as", value_name = "ALIAS")]
+        /// 별칭 이름
+        #[arg(long = "as", value_name = "별칭")]
         alias: Option<String>,
         /// 실행할 명령 (예: claude)
+        #[arg(value_name = "명령")]
         command: String,
         /// 기억할 파라미터
-        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        #[arg(value_name = "인자", required = true, trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
     /// 등록된 규칙 보기
     #[command(alias = "ls")]
     List,
     /// 규칙 삭제
-    #[command(alias = "rm")]
-    Remove { trigger: String },
+    #[command(
+        alias = "rm",
+        override_usage = "argmem remove <이름>",
+        after_help = "예:\n  argmem remove claude\n\n등록된 이름 확인: argmem list"
+    )]
+    Remove {
+        /// 삭제할 규칙 이름 (확장 규칙은 명령 이름, 별칭 규칙은 별칭)
+        #[arg(value_name = "이름")]
+        trigger: String,
+    },
     /// 셸 설정 파일(argmem.ps1 / argmem.doskey) 다시 생성
     Apply,
     /// PowerShell 프로필과 cmd AutoRun 에 연결
@@ -44,26 +74,139 @@ enum Cmd {
     /// 연결 해제 (규칙 파일은 남겨 둠)
     Uninstall,
     /// PowerShell 히스토리에서 자주 쓰는 파라미터 추천
+    #[command(
+        override_usage = "argmem learn [--top <개수>] [--min <횟수>] [--pick <번호> [--as <별칭>]]",
+        after_help = "예:\n  argmem learn\n  argmem learn --min 5 --top 20\n  argmem learn --pick 2 --as gs"
+    )]
     Learn {
-        /// 보여 줄 개수
-        #[arg(long, default_value_t = 10)]
+        /// 보여 줄 개수 (기본 10)
+        #[arg(long, value_name = "개수", default_value_t = 10, hide_default_value = true)]
         top: usize,
-        /// 최소 반복 횟수
-        #[arg(long, default_value_t = 3)]
+        /// 최소 반복 횟수 (기본 3)
+        #[arg(long, value_name = "횟수", default_value_t = 3, hide_default_value = true)]
         min: usize,
-        /// 추천 목록의 N 번을 바로 등록
-        #[arg(long, value_name = "N")]
+        /// 추천 목록의 해당 번호를 바로 등록
+        #[arg(long, value_name = "번호")]
         pick: Option<usize>,
         /// --pick 과 함께: 별칭으로 등록
-        #[arg(long = "as", value_name = "ALIAS", requires = "pick")]
+        #[arg(long = "as", value_name = "별칭", requires = "pick")]
         alias: Option<String>,
     },
     /// 상태 확인 (파일 위치, 연결 여부)
     Status,
 }
 
+/// 도움말 제목·서식을 한국어로 맞춘 clap Command.
+fn build_cli() -> clap::Command {
+    fn localize(c: clap::Command) -> clap::Command {
+        // 인자가 없는 명령은 "[OPTIONS]" 대신 깔끔한 사용법을 보여 준다.
+        let c = if c.get_arguments().next().is_none() {
+            let usage = format!("argmem {}", c.get_name());
+            c.override_usage(usage)
+        } else {
+            c
+        };
+        let mut order = 0;
+        c.help_template(HELP_TEMPLATE).mut_args(|a| {
+            order += 1;
+            let heading = if a.is_positional() { "인자" } else { "옵션" };
+            // -h / -V 는 항상 맨 아래
+            let o = match a.get_id().as_str() {
+                "help" => 1000,
+                "version" => 1001,
+                _ => order,
+            };
+            a.help_heading(heading).display_order(o)
+        })
+    }
+    localize(Cli::command()).mut_subcommands(localize)
+}
+
+fn parse(args: &[OsString]) -> Result<Cli, clap::Error> {
+    let m = build_cli().try_get_matches_from(args)?;
+    Cli::from_arg_matches(&m)
+}
+
+/// 파라미터를 잘못 입력했을 때: 한국어 오류 + 제안 + 해당 명령의 전체 사용법.
+fn usage_error(e: &clap::Error, args: &[OsString]) -> String {
+    let get = |k: ContextKind| match e.get(k) {
+        Some(ContextValue::String(s)) => s.clone(),
+        Some(ContextValue::Strings(v)) => v.join(", "),
+        Some(other) => other.to_string(),
+        None => String::new(),
+    };
+    let mut msg = match e.kind() {
+        ErrorKind::InvalidSubcommand => {
+            format!("알 수 없는 명령입니다: '{}'", get(ContextKind::InvalidSubcommand))
+        }
+        ErrorKind::UnknownArgument => {
+            format!("알 수 없는 옵션입니다: '{}'", get(ContextKind::InvalidArg))
+        }
+        ErrorKind::MissingRequiredArgument => {
+            format!("필요한 값이 빠졌습니다: {}", get(ContextKind::InvalidArg))
+        }
+        ErrorKind::MissingSubcommand | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+            "명령을 입력하세요.".to_string()
+        }
+        ErrorKind::InvalidValue | ErrorKind::ValueValidation => format!(
+            "{} 에 잘못된 값입니다: '{}'",
+            get(ContextKind::InvalidArg),
+            get(ContextKind::InvalidValue)
+        ),
+        ErrorKind::ArgumentConflict => {
+            let (a, b) = (get(ContextKind::InvalidArg), get(ContextKind::PriorArg));
+            if b.is_empty() || a == b {
+                format!("옵션을 두 번 이상 입력했습니다: {a}")
+            } else {
+                format!("함께 쓸 수 없는 옵션입니다: {a}, {b}")
+            }
+        }
+        ErrorKind::TooManyValues => {
+            format!("값이 너무 많습니다: {}", get(ContextKind::InvalidArg))
+        }
+        _ => e
+            .render()
+            .to_string()
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .trim_start_matches("error: ")
+            .to_string(),
+    };
+    for k in [ContextKind::SuggestedSubcommand, ContextKind::SuggestedArg] {
+        let s = get(k);
+        if !s.is_empty() {
+            msg.push_str(&format!("\n  혹시 '{s}' 을(를) 입력하려던 건가요?"));
+        }
+    }
+
+    // 명령 이름이 맞으면 그 명령의 사용법을, 아니면 전체 사용법을 보여 준다.
+    let mut cmd = build_cli();
+    cmd.build();
+    let sub = args
+        .iter()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned())
+        .find(|a| !a.starts_with('-'))
+        .filter(|s| cmd.find_subcommand(s).is_some());
+    let help = match sub {
+        Some(s) => cmd.find_subcommand_mut(&s).expect("checked above").render_help(),
+        None => cmd.render_help(),
+    };
+    format!("오류: {msg}\n\n{help}")
+}
+
 fn main() {
-    if let Err(e) = run(Cli::parse()) {
+    let args: Vec<OsString> = std::env::args_os().collect();
+    let cli = match parse(&args) {
+        Ok(c) => c,
+        Err(e) if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) => e.exit(),
+        Err(e) => {
+            eprint!("{}", usage_error(&e, &args));
+            std::process::exit(2);
+        }
+    };
+    if let Err(e) = run(cli) {
         eprintln!("오류: {e}");
         std::process::exit(1);
     }
@@ -91,9 +234,10 @@ fn run(cli: Cli) -> Result<(), String> {
     let mut store = Store::load().map_err(|e| e.to_string())?;
     match cli.cmd {
         Cmd::Add { alias, command, args } => {
-            validate_name("명령", &command)?;
             let trigger = alias.unwrap_or_else(|| command.clone());
-            validate_name("별칭", &trigger)?;
+            validate_name("명령", &command)
+                .and_then(|_| validate_name("별칭", &trigger))
+                .map_err(|e| format!("{e}\n\n{ADD_USAGE}"))?;
             add_rule(&mut store, Rule { trigger, command, args: join_args(&args) })?;
         }
         Cmd::List => {
@@ -108,7 +252,13 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Cmd::Remove { trigger } => {
             if !store.remove(&trigger) {
-                return Err(format!("'{trigger}' 규칙이 없습니다"));
+                let names: Vec<&str> = store.rules.iter().map(|r| r.trigger.as_str()).collect();
+                let hint = if names.is_empty() {
+                    "등록된 규칙이 없습니다.".to_string()
+                } else {
+                    format!("등록된 규칙: {}", names.join(", "))
+                };
+                return Err(format!("'{trigger}' 규칙이 없습니다.\n  {hint}"));
             }
             println!("삭제: {trigger}");
             save_and_apply(&store)?;
@@ -146,9 +296,13 @@ fn run(cli: Cli) -> Result<(), String> {
         Cmd::Learn { top, min, pick, alias } => {
             let list = learn::suggest(&store, min);
             if let Some(n) = pick {
-                let s = list
-                    .get(n.wrapping_sub(1))
-                    .ok_or_else(|| format!("{n} 번 추천이 없습니다"))?;
+                let s = list.get(n.wrapping_sub(1)).ok_or_else(|| {
+                    if list.is_empty() {
+                        format!("{n} 번 추천이 없습니다. {min}회 이상 반복된 명령+파라미터가 없습니다.")
+                    } else {
+                        format!("{n} 번 추천이 없습니다. 1 ~ {} 번 중에서 고르세요 (목록: argmem learn).", list.len())
+                    }
+                })?;
                 validate_name("명령", &s.command)?;
                 if alias.is_none() && s.variants > 1 {
                     return Err(format!(
@@ -168,11 +322,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 println!("{min}회 이상 반복된 명령+파라미터가 없습니다.");
             }
             for (i, s) in list.iter().take(top).enumerate() {
-                let note = if s.variants > 1 {
-                    format!("   (다른 파라미터로도 사용 → 별칭 권장)")
-                } else {
-                    String::new()
-                };
+                let note = if s.variants > 1 { "   (다른 파라미터로도 사용 → 별칭 권장)" } else { "" };
                 println!("{:>2}. ({:>3}회) {} {}{note}", i + 1, s.count, s.command, s.args);
             }
             if !list.is_empty() {
@@ -194,4 +344,104 @@ fn run(cli: Cli) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn err_text(args: &[&str]) -> String {
+        let args: Vec<OsString> = args.iter().map(OsString::from).collect();
+        let e = parse(&args).err().expect("should fail to parse");
+        usage_error(&e, &args)
+    }
+
+    #[test]
+    fn cli_is_consistent() {
+        build_cli().debug_assert();
+    }
+
+    #[test]
+    fn valid_add_keeps_hyphen_args() {
+        let args: Vec<OsString> =
+            ["argmem", "add", "claude", "--dangerously-skip-permissions"].iter().map(OsString::from).collect();
+        match parse(&args).unwrap().cmd {
+            Cmd::Add { command, args, .. } => {
+                assert_eq!(command, "claude");
+                assert_eq!(args, ["--dangerously-skip-permissions"]);
+            }
+            _ => panic!("expected add"),
+        }
+    }
+
+    #[test]
+    fn unknown_subcommand_suggests_and_shows_top_help() {
+        let t = err_text(&["argmem", "ad"]);
+        assert!(t.starts_with("오류: 알 수 없는 명령입니다: 'ad'"), "{t}");
+        assert!(t.contains("혹시 'add'"), "{t}");
+        assert!(t.contains("사용법: argmem <명령>"), "{t}");
+        assert!(t.contains("명령:") && t.contains("learn"), "{t}");
+    }
+
+    #[test]
+    fn missing_args_shows_subcommand_help() {
+        let t = err_text(&["argmem", "add", "claude"]);
+        assert!(t.contains("필요한 값이 빠졌습니다: <인자>..."), "{t}");
+        assert!(t.contains("사용법: argmem add [--as <별칭>] <명령> <인자>..."), "{t}");
+        assert!(t.find("<명령>     ").unwrap() < t.find("<인자>...  ").unwrap(), "{t}");
+        assert!(t.contains("argmem add --as gl git log"), "{t}");
+    }
+
+    #[test]
+    fn unknown_option_shows_subcommand_help() {
+        let t = err_text(&["argmem", "learn", "--bogus"]);
+        assert!(t.contains("알 수 없는 옵션입니다: '--bogus'"), "{t}");
+        assert!(t.contains("사용법: argmem learn"), "{t}");
+        assert!(t.contains("--pick <번호>"), "{t}");
+    }
+
+    #[test]
+    fn similar_option_is_suggested() {
+        let t = err_text(&["argmem", "learn", "--pik", "1"]);
+        assert!(t.contains("혹시 '--pick'"), "{t}");
+    }
+
+    #[test]
+    fn bad_value_is_reported() {
+        let t = err_text(&["argmem", "learn", "--top", "abc"]);
+        assert!(t.contains("잘못된 값입니다: 'abc'"), "{t}");
+        assert!(t.contains("--top <개수>"), "{t}");
+    }
+
+    #[test]
+    fn repeated_option() {
+        let t = err_text(&["argmem", "learn", "--top", "1", "--top", "2"]);
+        assert!(t.contains("두 번 이상 입력했습니다: --top"), "{t}");
+    }
+
+    #[test]
+    fn missing_subcommand() {
+        let t = err_text(&["argmem"]);
+        assert!(t.starts_with("오류: 명령을 입력하세요."), "{t}");
+    }
+
+    #[test]
+    fn alias_subcommand_help() {
+        let t = err_text(&["argmem", "rm"]);
+        assert!(t.contains("사용법: argmem remove <이름>"), "{t}");
+    }
+
+    #[test]
+    fn no_english_leftovers_in_help() {
+        let mut cmd = build_cli();
+        cmd.build();
+        let mut all = cmd.render_help().to_string();
+        for sc in cmd.get_subcommands_mut() {
+            all.push_str(&sc.render_help().to_string());
+        }
+        for word in ["OPTIONS", "Usage", "Options", "Arguments", "Commands", "default:", "Print"] {
+            assert!(!all.contains(word), "'{word}' in help:\n{all}");
+        }
+        assert!(all.contains("사용법: argmem list\n"), "{all}");
+    }
 }
