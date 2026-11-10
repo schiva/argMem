@@ -92,8 +92,29 @@ enum Cmd {
         #[arg(long = "as", value_name = "별칭", requires = "pick")]
         alias: Option<String>,
     },
+    /// 설정 보기/변경
+    #[command(
+        override_usage = "argmem config [<설정> <on|off>]",
+        after_help = "설정:\n  enter  PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행 (기본 off)\n\n예:\n  argmem config\n  argmem config enter on\n  argmem config enter off"
+    )]
+    Config {
+        /// 설정 이름: enter
+        #[arg(value_name = "설정", value_parser = ["enter"], hide_possible_values = true, requires = "value")]
+        key: Option<String>,
+        /// on 또는 off
+        #[arg(value_name = "값", value_parser = ["on", "off"], hide_possible_values = true)]
+        value: Option<String>,
+    },
     /// 상태 확인 (파일 위치, 연결 여부)
     Status,
+}
+
+fn print_settings(store: &Store) {
+    let on = |b: bool| if b { "on" } else { "off" };
+    println!(
+        "enter = {:<3}  PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행",
+        on(store.settings.expand_on_enter)
+    );
 }
 
 /// 도움말 제목·서식을 한국어로 맞춘 clap Command.
@@ -329,8 +350,20 @@ fn run(cli: Cli) -> Result<(), String> {
                 println!("\n등록: argmem learn --pick <번호> [--as <별칭>]");
             }
         }
+        Cmd::Config { key, value } => match (key.as_deref(), value.as_deref()) {
+            (Some("enter"), Some(v)) => {
+                store.settings.expand_on_enter = v == "on";
+                print_settings(&store);
+                save_and_apply(&store)?;
+            }
+            _ => print_settings(&store),
+        },
         Cmd::Status => {
             println!("규칙 파일 : {} ({}개)", store::rules_path().display(), store.rules.len());
+            println!(
+                "Enter 확장: {}",
+                if store.settings.expand_on_enter { "on" } else { "off (argmem config enter on 으로 켜기)" }
+            );
             println!("PowerShell: {}", emit::ps1_path().display());
             println!("cmd       : {}", emit::doskey_path().display());
             for p in install::profile_paths() {
@@ -417,6 +450,17 @@ mod tests {
     fn repeated_option() {
         let t = err_text(&["argmem", "learn", "--top", "1", "--top", "2"]);
         assert!(t.contains("두 번 이상 입력했습니다: --top"), "{t}");
+    }
+
+    #[test]
+    fn config_parses_and_validates() {
+        let args: Vec<OsString> = ["argmem", "config", "enter", "on"].iter().map(OsString::from).collect();
+        assert!(matches!(parse(&args).unwrap().cmd, Cmd::Config { key: Some(_), value: Some(_) }));
+        let t = err_text(&["argmem", "config", "enter", "yes"]);
+        assert!(t.contains("잘못된 값입니다: 'yes'"), "{t}");
+        assert!(t.contains("사용법: argmem config"), "{t}");
+        let t = err_text(&["argmem", "config", "enter"]);
+        assert!(t.contains("필요한 값이 빠졌습니다"), "{t}");
     }
 
     #[test]

@@ -21,8 +21,17 @@ impl Rule {
     }
 }
 
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+pub struct Settings {
+    /// PowerShell 에서 등록 이름만 입력하고 Enter 를 눌러도 확장해서 실행
+    #[serde(default)]
+    pub expand_on_enter: bool,
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct Store {
+    #[serde(default)]
+    pub settings: Settings,
     #[serde(default)]
     pub rules: Vec<Rule>,
 }

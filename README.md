@@ -80,6 +80,7 @@ argmem install
 | `argmem remove <이름>` (`rm`) | 규칙 삭제 |
 | `argmem learn [--top 10] [--min 3]` | PowerShell 히스토리에서 반복되는 명령+파라미터 추천 |
 | `argmem learn --pick <번호> [--as <별칭>]` | 추천 항목을 바로 등록 |
+| `argmem config [enter on\|off]` | 설정 보기 / 변경 ([Enter 확장](#enter-확장)) |
 | `argmem apply` | `rules.json` 으로 셸 설정 파일 다시 생성 |
 | `argmem status` | 파일 위치와 프로필·AutoRun 연결 여부 확인 |
 | `argmem install` / `uninstall` | 셸에 연결 / 연결 해제 (규칙 파일은 유지) |
@@ -101,12 +102,28 @@ argmem learn --pick 2 --as gs
 
 | 규칙 | PowerShell | cmd |
 |---|---|---|
-| **확장** (`claude`) | 줄 전체가 `claude` 이고 커서가 줄 끝일 때 **Space** → 파라미터가 입력줄에 채워짐 | `claude` 입력 시 doskey 가 파라미터를 붙여 실행 (화면에는 안 보임) |
+| **확장** (`claude`) | 줄 전체가 `claude` 이고 커서가 줄 끝일 때 **Space** → 파라미터가 입력줄에 채워짐. [Enter 확장](#enter-확장)을 켜면 `claude` + Enter 도 확장 후 실행 | `claude` 입력 시 doskey 가 파라미터를 붙여 실행 (화면에는 안 보임) |
 | **별칭** (`gl`) | `gl` + Space → 펼쳐짐, `gl` + Enter → 바로 실행. `gl`(=Get-Location) 같은 기본 별칭도 덮어씀 | doskey 매크로로 펼쳐서 실행 |
+
+뒤에 파라미터를 더 붙이면 등록된 파라미터 뒤에 이어집니다. 예를 들어 `claude` + Space + `-c` 는 `claude --dangerously-skip-permissions -c` 로 실행됩니다. cmd 에서 `claude -c` 를 입력해도 결과가 같습니다.
+
+### Enter 확장
+
+기본으로는 PowerShell 에서 **Space** 를 눌러야 확장됩니다. 그래서 `claude` 만 입력하고 바로 Enter 를 누르면 파라미터가 붙지 않습니다. Enter 로도 확장하려면 이 설정을 켜세요.
+
+```powershell
+argmem config enter on    # 켜기
+argmem config enter off   # 끄기 (기본)
+argmem config             # 현재 설정 보기
+```
+
+- 줄 전체가 정확히 등록 이름일 때만 Enter 에서 확장한 뒤 실행합니다. 이때 확장된 줄이 화면과 히스토리에 남습니다.
+- 켜면 Enter 를 누르기 전에 붙는 파라미터를 확인할 기회가 없어집니다.
+- 새 창부터 적용됩니다. cmd 는 원래 Enter 에서 매크로가 적용되므로 이 설정과 상관이 없습니다.
 
 ### 원래 명령 그대로 실행하기
 
-- PowerShell: **Shift+Space** 로 띄어쓰면 확장되지 않습니다.
+- PowerShell: **Shift+Space** 로 띄어쓰거나, 명령 앞에 **공백 한 칸**을 넣으면 (` claude`) Space·Enter 모두 확장하지 않습니다.
 - cmd: 명령 앞에 **공백 한 칸**을 넣으면 (` claude`) doskey 매크로를 거치지 않습니다.
 
 ### learn

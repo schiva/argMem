@@ -1,6 +1,6 @@
 [package]
 name = "argmem"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "자주 쓰는 명령 파라미터를 기억해 PowerShell / cmd 에서 자동 입력"
 
