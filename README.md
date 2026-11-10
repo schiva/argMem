@@ -9,19 +9,46 @@ PS> claude --dangerously-skip-permissions ␣   ← 입력줄이 이렇게 채�
 
 ## 요구 사항
 
-- Windows 10/11
+- 64비트 Windows 10/11
 - Windows PowerShell 5.1 또는 PowerShell 7 (`pwsh`), PSReadLine (기본 포함)
-- 빌드: Rust (stable, `x86_64-pc-windows-msvc`) + Visual C++ Build Tools
+- VC++ 재배포 패키지는 필요 없습니다 (런타임 정적 링크).
 
 ## 설치
 
+### 방법 1. PowerShell 한 줄 (권장)
+
 ```powershell
-winget install Rustlang.Rustup   # Rust 가 없다면
-cargo install --path .           # argmem.exe → %USERPROFILE%\.cargo\bin
-argmem install                   # PowerShell 프로필 + cmd AutoRun 에 연결
+irm https://github.com/schiva/argMem/releases/latest/download/install.ps1 | iex
 ```
 
-`install` 이 하는 일:
+[GitHub Releases](https://github.com/schiva/argMem/releases) 에서 최신 `argmem.exe` 를 내려받습니다. 이어서 다음을 처리합니다.
+
+1. `SHA256SUMS.txt` 로 파일을 검증합니다.
+2. `%LOCALAPPDATA%\Programs\argmem` 에 복사하고 사용자 PATH 에 추가합니다.
+3. `argmem install` 을 실행합니다.
+
+관리자 권한은 필요 없습니다.
+
+특정 버전을 설치하거나 제거할 때:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Version v0.1.0
+& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Uninstall
+```
+
+### 방법 2. zip
+
+Releases 에서 `argmem-<버전>-windows-x64.zip` 을 받아 압축을 풀고 `install.cmd` 를 더블클릭합니다. zip 안의 `argmem.exe` 로 방법 1 과 똑같이 설치합니다.
+
+### 방법 3. 소스에서 빌드
+
+```powershell
+winget install Rustlang.Rustup   # Rust (MSVC) + Visual C++ Build Tools 필요
+cargo install --path .           # argmem.exe → %USERPROFILE%\.cargo\bin
+argmem install
+```
+
+### `argmem install` 이 하는 일
 
 1. `%USERPROFILE%\.argmem\argmem.ps1` 과 `argmem.doskey` 를 생성합니다.
 2. Windows PowerShell 의 `$PROFILE.CurrentUserAllHosts` 에 아래 한 줄을 추가합니다. `pwsh` 가 설치돼 있으면 그쪽 프로필에도 추가합니다.
@@ -89,9 +116,13 @@ argmem learn --pick 2 --as gs
 ## 제거
 
 ```powershell
-argmem uninstall                          # 프로필 줄과 AutoRun 항목만 제거
+# 설치 스크립트로 설치한 경우: 연결 해제 + PATH 정리 + 프로그램 폴더 삭제
+& ([scriptblock]::Create((irm https://github.com/schiva/argMem/releases/latest/download/install.ps1))) -Uninstall
+
+# 직접 하려면
+argmem uninstall                                  # 프로필 줄과 AutoRun 항목만 제거
 Remove-Item -Recurse "$env:USERPROFILE\.argmem"   # 규칙까지 지우려면
-cargo uninstall argmem
+cargo uninstall argmem                            # 소스에서 설치한 경우
 ```
 
 `uninstall` 은 프로필에서 `# argmem` 표시가 붙은 줄만 지우고, AutoRun 에서 argmem 부분만 뺍니다. 그 결과 AutoRun 이 비면 값 자체를 삭제합니다.
@@ -111,12 +142,29 @@ src/store.rs    rules.json 읽기/쓰기, 이름 검사
 src/emit.rs     argmem.ps1 / argmem.doskey 생성
 src/install.rs  프로필·AutoRun 연결/해제 (reg.exe 사용)
 src/learn.rs    PSReadLine 히스토리 분석
+installer/      install.ps1 (ASCII 전용, irm | iex 용) / install.cmd (zip 더블클릭용)
+.github/workflows/release.yml   v* 태그 push 시 빌드·테스트·릴리스
 ```
 
 ```powershell
 cargo test
 cargo build --release
 ```
+
+### 릴리스
+
+`Cargo.toml` 의 `version` 을 올리고 커밋한 뒤 같은 버전의 태그를 push 합니다.
+
+```powershell
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+GitHub Actions 가 다음을 자동으로 처리합니다. 태그와 `Cargo.toml` 버전이 다르면 실패합니다.
+
+1. 테스트하고 빌드합니다.
+2. Release 를 만듭니다.
+3. 다음 파일을 올립니다: `argmem.exe`, `install.ps1`, `argmem-<태그>-windows-x64.zip`, `SHA256SUMS.txt`
 
 아래 환경 변수로 경로를 바꾸면 실제 프로필이나 레지스트리를 건드리지 않고 시험할 수 있습니다.
 
